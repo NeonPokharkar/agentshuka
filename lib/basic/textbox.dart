@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class TextInput extends StatelessWidget {
-  TextInput({super.key});
+  TextInput({required this.processInput});
+
+  Function(String) processInput;
 
   final TextEditingController controller = TextEditingController();
 
@@ -31,6 +36,7 @@ class TextInput extends StatelessWidget {
             child: IconButton(
               icon: Icon(Icons.send, color: Colors.white,),
               onPressed: () {
+                processInput(controller.text);
               },
             ),
           )

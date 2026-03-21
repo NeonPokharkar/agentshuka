@@ -16,11 +16,15 @@ class Messagebubble extends StatelessWidget {
         padding: EdgeInsets.all(12),
         constraints: BoxConstraints(maxWidth: 250),
         decoration: BoxDecoration(
-          color: isMe ? Colors.green[300] : Colors.grey[300]
+          color: isMe ? Colors.deepPurple[300] : Colors.grey[300],
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomLeft: isMe?Radius.circular(20):Radius.zero, bottomRight: !isMe?Radius.circular(20):Radius.zero)
         ),
         child: Text(
           text,
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(
+              fontSize: 16,
+            color: isMe ? Colors.white : Colors.black
+          ),
         ),
       ),
     );

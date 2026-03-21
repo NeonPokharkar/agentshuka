@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:agentshuka/basic/messagebubble.dart';
@@ -15,9 +16,66 @@ class ChatWindow extends StatefulWidget {
 }
 
 class _ChatWindowState extends State<ChatWindow> {
+  String status = "Contacting";
+
   final List<Map<String, dynamic>> messages = [
     {"text": "Ask me anything!", "isMe" : false}
   ];
+
+  Timer? _timer;
+
+  @override
+  void initState() {
+    checkStatusPeriodic();
+    // TODO: implement initState
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    // TODO: implement dispose
+    super.dispose();
+  }
+
+  void checkStatusPeriodic() {
+    _timer = Timer.periodic(
+      const Duration(seconds: 10), // Interval
+          (timer) async {
+        if(status != "Thinking")
+          {
+            String stat = await getIfActive();
+
+            setState(() {
+              status = stat;
+            });
+          }
+      },
+    );
+  }
+
+  Future<String> getIfActive() async {
+    print("Checking Availability of Server");
+
+    final uri = Uri.http("100.72.140.76:8000","/status");
+
+    try {
+      final response = await http.get(uri);
+
+      if(response.statusCode == 200)
+        {
+          final data = json.decode(response.body);
+
+          return data["status"]?"Available":"Offline";
+        }
+      else {
+        return "Offline";
+      }
+    } catch (e) {
+      print("Error : $e");
+      return "Network Error";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +84,20 @@ class _ChatWindowState extends State<ChatWindow> {
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(),
+            CircleAvatar(
+              backgroundImage: AssetImage("assets/icon/icon.png"),
+            ),
             SizedBox(width: 10,),
-            Text("Shuka")
+            Text("Shuka"),
+            SizedBox(width: 10,),
+            Text(
+              status,
+              style: TextStyle(
+                color: Colors.deepPurpleAccent,
+                fontStyle: FontStyle.italic,
+                fontSize: 18
+              ),
+            )
           ],
         ),
       ),
@@ -46,10 +115,17 @@ class _ChatWindowState extends State<ChatWindow> {
                 },
               ),
             ),
-            TextInput(
+            ChatInput(
+              isActive: status == "Available",
               processInput: (str) async {
+                if(status!="Available")
+                  {
+                    return;
+                  }
+
                 setState(() {
                   messages.add({"text":str, "isMe":true});
+                  status = "Thinking";
                 });
 
                 final queryParams = {
@@ -67,27 +143,38 @@ class _ChatWindowState extends State<ChatWindow> {
                   if(response.statusCode == 200)
                   {
                     var message = "";
+                    var isError = false;
 
                     response.stream.listen((value) {
                       final chunk = String.fromCharCodes(value);
-                      print("Recieved : $chunk");
                       message+=chunk;
-                    }).onDone(() {
+                    }, onError: (e) {
+                      isError = true;
                       setState(() {
-                        messages.add({"text": message, "isMe":false});
+                        messages.add({"text": "Some error occurred on client side", "isMe":false});
+                        status = "Available";
                       });
+                    }, onDone: () {
+                      if(response.statusCode==200 && !isError) {
+                        setState(() {
+                          messages.add({"text": message, "isMe":false});
+                          status = "Available";
+                        });
+                      }
                     });
 
                   } else {
                     print("Request Failed");
                     setState(() {
                       messages.add({"text": "Some error occurred on server : ${response.statusCode}", "isMe":false});
+                      status = "Available";
                     });
                   }
                 } catch (e) {
                   print("Error : $e");
                   setState(() {
-                    messages.add({"text": "Some error occurred : ${e}", "isMe":false});
+                    messages.add({"text": "Some error occurred on client side", "isMe":false});
+                    status = "Available";
                   });
                 }
               },

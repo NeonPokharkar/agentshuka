@@ -42,6 +42,14 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon/icon.png"
 
+flutter_native_splash:
+  color: "#c2c2ff"
+  image: assets/icon/icon.png
+
+android_12:
+  image: assets/icon/icon.png # Specifically for Android 12+
+  color: "#c2c2ff"
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -52,6 +60,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

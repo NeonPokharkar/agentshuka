@@ -1,8 +1,16 @@
 import 'package:agentshuka/basic/chatwindow.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await AndroidAlarmManager.initialize();
+
   runApp(const MyApp());
+
+  await appPermissions.request();
 }
 
 class MyApp extends StatelessWidget {
@@ -21,3 +29,5 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+List<Permission> appPermissions = [Permission.microphone, Permission.notification, Permission.scheduleExactAlarm];

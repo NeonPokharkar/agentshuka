@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:agentshuka/basic/alarmmanager.dart';
+import 'package:agentshuka/basic/voicebubble.dart';
 import 'package:flutter/services.dart';
 
 import 'package:agentshuka/basic/messagebubble.dart';
@@ -9,6 +11,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
+import 'package:shake/shake.dart';
 
 class ChatWindow extends StatefulWidget {
   const ChatWindow({super.key});
@@ -20,6 +23,8 @@ class ChatWindow extends StatefulWidget {
 class _ChatWindowState extends State<ChatWindow> {
   String status = "Contacting";
   String premise = "Shuka is here to help!";
+
+  final String error_string = "There is some error";
 
   final ValueNotifier<IconData> stepIcon = ValueNotifier(Icons.question_mark_outlined);
   final ValueNotifier<String> stepText = ValueNotifier("");
@@ -38,9 +43,44 @@ class _ChatWindowState extends State<ChatWindow> {
 
   Timer? _timer;
 
+  late ShakeDetector detector;
+  bool isShukaVoiceDialogOpen = false;
+  VoicebubbleController controller = VoicebubbleController();
+
+  BuildContext? ctxglobal=null;
+
   @override
   void initState() {
     checkStatusPeriodic();
+
+    detector = ShakeDetector.autoStart(
+      onPhoneShake: (ShakeEvent event) async {
+        if(ctxglobal==null)
+        {
+          return;
+        }
+
+        if(status!="Available")
+        {
+          return;
+        }
+
+        if(!isShukaVoiceDialogOpen)
+        {
+          final result = await listenToUser(ctxglobal!);
+          sendMessageToShuka(ctxglobal!, result, true);
+        }
+        else {
+          controller.restartListening!();
+        }
+      },
+      useFilter: true,
+      shakeSlopTimeMS: 300,
+      shakeCountResetTime: 2000,
+      shakeThresholdGravity: 2.7,
+      minimumShakeCount: 1,
+    );
+
     // TODO: implement initState
     super.initState();
   }
@@ -48,8 +88,45 @@ class _ChatWindowState extends State<ChatWindow> {
   @override
   void dispose() {
     _timer?.cancel();
+    detector.stopListening();
+    ctxglobal = null;
     // TODO: implement dispose
     super.dispose();
+  }
+
+  Future<String> listenToUser(BuildContext ctx, {String extraInfo = ""}) async {
+    isShukaVoiceDialogOpen = true;
+    String result = await showDialog(
+      context: ctx,
+      barrierDismissible: false, // Prevents closing by tapping outside
+      builder: (BuildContext context) {
+        return PopScope(
+          canPop: false, // Prevents closing with the hardware back button
+          child: AlertDialog(
+            content: Voicebubble(controller: controller, userTarget: ShukaVerbalState.Listening, extraInfo: extraInfo,),
+          ),
+        );
+      },
+    );
+    isShukaVoiceDialogOpen=false;
+    return result;
+  }
+
+  Future<void> speakToUser(BuildContext ctx, String speech) async {
+    isShukaVoiceDialogOpen = true;
+    await showDialog(
+      context: ctx,
+      barrierDismissible: false, // Prevents closing by tapping outside
+      builder: (BuildContext context) {
+        return PopScope(
+          canPop: false, // Prevents closing with the hardware back button
+          child: AlertDialog(
+            content: Voicebubble(controller: controller, userTarget: ShukaVerbalState.Speaking, extraInfo: speech,),
+          ),
+        );
+      },
+    );
+    isShukaVoiceDialogOpen=false;
   }
 
   void popLoadingDialog(BuildContext ctx) {
@@ -63,7 +140,7 @@ class _ChatWindowState extends State<ChatWindow> {
         return;
       }
 
-    Navigator.pop(context);
+    Navigator.pop(ctx);
 
     dialogEnabled = false;
   }
@@ -82,6 +159,12 @@ class _ChatWindowState extends State<ChatWindow> {
     if(dialogEnabled)
       {
         return;
+      }
+
+    if(isShukaVoiceDialogOpen)
+      {
+        controller.pop!();
+        isShukaVoiceDialogOpen=false;
       }
 
     dialogEnabled = true;
@@ -294,8 +377,130 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
+  Future<void> sendMessageToShuka(BuildContext ctx, String str, bool fromVoiceMode) async {
+    if(status!="Available")
+    {
+      return;
+    }
+    var relevantConversation = summarizePastTenDialogs();
+
+    setState(() {
+      messages.add({"text":str, "isMe":true, "isJson": false, "extra": null});
+      status = "Thinking";
+    });
+
+    showLoadingDialog(ctx, "Contacting Shuka...", Icons.network_check);
+
+    final queryParams = {
+      "query" : str,
+      "conversation_summary" : premise,
+      "last_relevant_conversation" : relevantConversation
+    };
+    final uri = Uri.http("100.72.140.76:8000","/intelli-chat");
+    try {
+      final request = await http.Request('POST', uri);
+      request.headers.addAll({
+        'Connection': 'Keep-Alive',
+        'Keep-Alive': 'timeout=1000, max=1000',
+        'Content-Type': 'application/json; charset=UTF-8',
+      });
+      request.body = json.encode(queryParams);
+      final response = await http.Client().send(request);
+
+      if(response.statusCode == 200)
+      {
+        var process = [];
+        var isError = false;
+        var finl = "";
+        var thoughtsSummary = "";
+
+        response.stream.listen((value) {
+          final str = String.fromCharCodes(value);
+          final jsn = json.decode(str);
+          process.add(jsn);
+          showLoadingDialog(ctx, jsn["content"], iconsForAction(jsn["type"]));
+          if(jsn["type"]=="final_answer")
+          {
+            finl = jsn["content"];
+          }
+          else if(jsn["type"]=="start")
+          {
+            premise = jsn["content"];
+          }
+          else if(jsn["type"]=="summary")
+          {
+            thoughtsSummary = jsn["content"];
+          }
+        }, onError: (e) {
+          isError = true;
+          popLoadingDialog(ctx);
+          setState(() {
+            messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra": "Status Code: ${response.statusCode}, with error : ${e.toString()}"});
+            status = "Available";
+            if(fromVoiceMode)
+              {
+                shukaSpeak("There was some error!");
+              }
+          });
+        }, onDone: () {
+          if(response.statusCode==200 && !isError) {
+            popLoadingDialog(ctx);
+            setState(() {
+              messages.add({"text": json.encode({"answer":finl, "steps":process, "question" : str, "thoughts_summary": thoughtsSummary}), "isMe":false, "isJson":true, "extra": null});
+              status = "Available";
+              if(fromVoiceMode)
+              {
+                shukaSpeak(finl);
+              }
+            });
+          }
+        });
+
+      } else {
+        popLoadingDialog(ctx);
+        print("Request Failed");
+        setState(() {
+          messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with Status Code : ${response.statusCode}"});
+          status = "Available";
+          if(fromVoiceMode)
+          {
+            shukaSpeak("There was some error!");
+          }
+        });
+      }
+    } catch (e) {
+      popLoadingDialog(ctx);
+      print("Error : $e");
+      setState(() {
+        messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with error : ${e.toString()}"});
+        status = "Available";
+        if(fromVoiceMode)
+        {
+          shukaSpeak("There was some error!");
+        }
+      });
+    }
+  }
+
+  shukaSpeak(String text) async {
+    if(ctxglobal==null)
+    {
+      return;
+    }
+
+    if(!isShukaVoiceDialogOpen)
+    {
+      await speakToUser(ctxglobal!, text);
+    }
+    else {
+      controller.pop!();
+      await speakToUser(ctxglobal!, text);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ctxglobal = context;
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
@@ -319,40 +524,7 @@ class _ChatWindowState extends State<ChatWindow> {
         ),
       ),
       drawer: Drawer(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: EdgeInsets.only(top: 40, bottom: 20, left: 20),
-              decoration: BoxDecoration(
-                color: Colors.deepPurpleAccent,
-              ),
-              child: Text(
-                "Shuka",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 40
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                scrollDirection: Axis.vertical,
-                padding: EdgeInsets.all(10),
-                itemCount: notes.length,
-                itemBuilder: (context, index) {
-                  final note = notes[index];
-                  return ListTile(
-                    title: Text(note["name"]),
-                    onTap: () {
-                      print(note["name"]);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+        child: Alarmmanager(),
       ),
       body: SafeArea(
         child: Column(
@@ -435,93 +607,8 @@ class _ChatWindowState extends State<ChatWindow> {
             ),
             ChatInput(
               isActive: status == "Available",
-              processInput: (str) async {
-                if(status!="Available")
-                  {
-                    return;
-                  }
-                var relevantConversation = summarizePastTenDialogs();
-
-                setState(() {
-                  messages.add({"text":str, "isMe":true, "isJson": false, "extra": null});
-                  status = "Thinking";
-                });
-
-                showLoadingDialog(context, "Contacting Shuka...", Icons.network_check);
-
-                final queryParams = {
-                  "query" : str,
-                  "conversation_summary" : premise,
-                  "last_relevant_conversation" : relevantConversation
-                };
-                final uri = Uri.http("100.72.140.76:8000","/intelli-chat");
-                try {
-                  final request = await http.Request('POST', uri);
-                  request.headers.addAll({
-                    'Connection': 'Keep-Alive',
-                    'Keep-Alive': 'timeout=1000, max=1000',
-                    'Content-Type': 'application/json; charset=UTF-8',
-                  });
-                  request.body = json.encode(queryParams);
-                  final response = await http.Client().send(request);
-
-                  if(response.statusCode == 200)
-                  {
-                    var process = [];
-                    var isError = false;
-                    var finl = "";
-                    var thoughtsSummary = "";
-
-                    response.stream.listen((value) {
-                      final str = String.fromCharCodes(value);
-                      final jsn = json.decode(str);
-                      process.add(jsn);
-                      showLoadingDialog(context, jsn["content"], iconsForAction(jsn["type"]));
-                      if(jsn["type"]=="final_answer")
-                        {
-                          finl = jsn["content"];
-                        }
-                      else if(jsn["type"]=="start")
-                        {
-                          premise = jsn["content"];
-                        }
-                      else if(jsn["type"]=="summary")
-                        {
-                          thoughtsSummary = jsn["content"];
-                        }
-                    }, onError: (e) {
-                      isError = true;
-                      popLoadingDialog(context);
-                      setState(() {
-                        messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra": "Status Code: ${response.statusCode}, with error : ${e.toString()}"});
-                        status = "Available";
-                      });
-                    }, onDone: () {
-                      if(response.statusCode==200 && !isError) {
-                        popLoadingDialog(context);
-                        setState(() {
-                          messages.add({"text": json.encode({"answer":finl, "steps":process, "question" : str, "thoughts_summary": thoughtsSummary}), "isMe":false, "isJson":true, "extra": null});
-                          status = "Available";
-                        });
-                      }
-                    });
-
-                  } else {
-                    popLoadingDialog(context);
-                    print("Request Failed");
-                    setState(() {
-                      messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with Status Code : ${response.statusCode}"});
-                      status = "Available";
-                    });
-                  }
-                } catch (e) {
-                  popLoadingDialog(context);
-                  print("Error : $e");
-                  setState(() {
-                    messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with error : ${e.toString()}"});
-                    status = "Available";
-                  });
-                }
+              processInput: (str) {
+                sendMessageToShuka(context, str, false);
               },
             )
           ],

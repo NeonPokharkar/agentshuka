@@ -39,6 +39,13 @@ dependencies:
   flutter_markdown_plus: ^1.0.7
   latext: ^0.5.1
   markdown: ^7.2.1
+  speech_to_text: ^7.3.0
+  flutter_tts: ^4.2.5
+  shake: ^3.0.0
+  flutter_callkit_incoming: ^3.0.0
+  uuid: ^4.5.3
+  android_alarm_manager_plus: ^5.0.0
+  permission_handler: ^12.0.1
 
 dependency_overrides:
   flutter_math_fork:

@@ -46,13 +46,7 @@ dependencies:
   uuid: ^4.5.3
   android_alarm_manager_plus: ^5.0.0
   permission_handler: ^12.0.1
-
-dependency_overrides:
-  flutter_math_fork:
-    git:
-      url: https://github.com/simpleclub/flutter_math.git
-      ref: "6e84b607c5c0e00dd1f3d4bd30ef3f1628053328"
-
+  shared_preferences: ^2.5.5
 
 flutter_launcher_icons:
   android: true

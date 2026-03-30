@@ -524,7 +524,42 @@ class _ChatWindowState extends State<ChatWindow> {
         ),
       ),
       drawer: Drawer(
-        child: Alarmmanager(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: EdgeInsets.only(top: 40, bottom: 20, left: 20),
+              decoration: BoxDecoration(
+                color: Colors.deepPurpleAccent,
+              ),
+              child: Text(
+                "Shuka",
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 40
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  InkWell(
+                    child: ListTile(
+                      leading: Icon(Icons.alarm, color: Colors.deepPurple,),
+                      title: Text("Reminders", style: TextStyle(color: Colors.deepPurple),),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => Alarmmanager())
+                      );
+                    },
+                  )
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
         child: Column(

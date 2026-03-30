@@ -1,17 +1,12 @@
 import 'dart:convert';
-import 'dart:isolate';
+import 'dart:math';
 
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_callkit_incoming/entities/android_params.dart';
-import 'package:flutter_callkit_incoming/entities/call_event.dart';
-import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
-import 'package:flutter_callkit_incoming/entities/ios_params.dart';
-import 'package:flutter_callkit_incoming/entities/notification_params.dart';
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import 'package:agentshuka/extensions/basic.dart';
+
+import '../support/AlarmSupport.dart';
 
 class Alarmmanager extends StatefulWidget {
   const Alarmmanager({super.key});
@@ -21,211 +16,436 @@ class Alarmmanager extends StatefulWidget {
 }
 
 class _AlarmmanagerState extends State<Alarmmanager> {
-  List<AlarmCall> alarmCalls = [
-    AlarmCall(id: 3,uuid: const Uuid().v4(),title: "Hello", description: "World", callSpeech: "Hello World", time: DateTime.now().add(Duration(minutes: 1)))
-  ];
+  List<AlarmCall> alarmCalls = [];
 
-  static final FlutterTts _tts = FlutterTts();
+  late SharedPreferencesAsync preferencesAsync = SharedPreferencesAsync();
 
   @override
   void initState() {
+    getAlarms();
     // TODO: implement initState
     super.initState();
   }
 
-  @pragma('vm:entry-point')
-  static Future<void> triggerCallUI(int id, Map<String, dynamic> alarmParams) async {
-    print("Checking whether I can use calls");
-    if(!await FlutterCallkitIncoming.canUseFullScreenIntent()) {
-      print("cant use calls");
-      await FlutterCallkitIncoming.requestFullIntentPermission();
-    }
-
-    print("can use calls, starting : ${json.encode(alarmParams)}");
-
-    final params = CallKitParams(
-      id: alarmParams["uuid"],
-      nameCaller: alarmParams["title"],
-      appName: 'Shuka',
-      avatar: "assets/icon/icon.png",
-      handle: alarmParams["description"],
-      type: 0,
-      textAccept: 'Complete',
-      textDecline: 'Cancel',
-      missedCallNotification: NotificationParams(
-        showNotification: true,
-        isShowCallback: true,
-        subtitle: 'Missed task',
-        callbackText: 'Retry',
-      ),
-      callingNotification: const NotificationParams(
-        showNotification: true,
-        isShowCallback: true,
-        subtitle: 'Reminder...',
-        callbackText: 'Retry',
-      ),
-      duration: 30000,
-      android: AndroidParams(
-          isCustomNotification: true,
-          isShowLogo: false,
-          logoUrl: "assets/icon/icon.png",
-          ringtonePath: 'system_ringtone_default',
-          backgroundColor: Colors.white.toHex(),
-          actionColor: Colors.deepPurple.toHex(),
-          textColor: Colors.deepPurple.toHex(),
-          incomingCallNotificationChannelName: "Incoming Call",
-          missedCallNotificationChannelName: "Missed Call",
-          isShowCallID: true,
-          isShowFullLockedScreen: true,
-          isImportant: true,
-      ),
-      ios: IOSParams(
-        iconName: 'CallKitLogo',
-        handleType: 'generic',
-        supportsVideo: true,
-        maximumCallGroups: 2,
-        maximumCallsPerCallGroup: 1,
-        audioSessionMode: 'default',
-        audioSessionActive: true,
-        audioSessionPreferredSampleRate: 44100.0,
-        audioSessionPreferredIOBufferDuration: 0.005,
-        supportsDTMF: true,
-        supportsHolding: true,
-        supportsGrouping: false,
-        supportsUngrouping: false,
-        ringtonePath: 'system_ringtone_default',
-      ),
-    );
-
-    print("Setting onEvent");
-
-    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
-      switch (event!.event) {
-        case Event.actionCallIncoming:
-          print("actionCallIncoming");
-          break;
-        case Event.actionCallAccept:
-          print("actionCallAccept");
-          await startSpeaking(alarmParams["callSpeech"]);
-          await FlutterCallkitIncoming.endCall(alarmParams["uuid"]);
-          break;
-        case Event.actionCallDecline:
-          print("actionCallDecline");
-          break;
-        case Event.actionCallStart:
-          print("actionCallStart");
-          break;
-        case Event.actionCallConnected:
-          print("actionCallConnected");
-          break;
-        case Event.actionCallTimeout:
-          print("actionCallTimeout");
-          break;
-        case Event.actionCallEnded:
-          print("actionCallEnded");
-          break;
-        case Event.actionCallCallback:
-          print("actionCallCallback");
-          break;
-        default:
-          print("default");
-          break;
-      }
-    }, onError: (error) {
-      print("Error in calling occured = ${error}");
+  Future<void> getAlarms() async {
+    setState(() {
+      alarmCalls=[];
     });
 
-    print("Actual call");
+    List<AlarmCall> calls = [];
 
-    await FlutterCallkitIncoming.showCallkitIncoming(params);
+    List<String>? alarmIds = await preferencesAsync.getStringList("AlarmIdList");
 
-    print("Call complete");
+    alarmIds ??= [];
+
+    for(String alarmId in alarmIds)
+      {
+        String? alarm = await preferencesAsync.getString(alarmId);
+
+        if(alarm==null)
+          {
+            return;
+          }
+
+        AlarmCall alarmCall = AlarmCall.fromJson(alarm);
+
+        calls.add(alarmCall);
+      }
+
+    final dateNow = DateTime.now();
+    final dateTom = DateTime.now().add(Duration(days: 1));
+
+    calls.forEach((call) {
+
+      if(call.isPeriodic)
+        {
+          final todayAlarm = DateTime(dateNow.year, dateNow.month, dateNow.day, call.time.hour, call.time.minute);
+          final tomAlarm = DateTime(dateTom.year, dateTom.month, dateTom.day, call.time.hour, call.time.minute);
+          if(todayAlarm.millisecondsSinceEpoch<dateNow.millisecondsSinceEpoch)
+            {
+              call.time = tomAlarm;
+            }
+          else {
+            call.time = todayAlarm;
+          }
+        }
+    });
+
+    calls.sort((a, b) {
+      return a.time.millisecondsSinceEpoch-b.time.millisecondsSinceEpoch;
+    },);
+
+    setState(() {
+      alarmCalls = calls;
+    });
   }
 
-  static Future<void> startSpeaking(String speech) async {
-    await _tts.stop();
-    await _tts.setLanguage("en-US");
-    await _tts.setPitch(1.0);
-    await _tts.speak(speech);
+  Future<String?> displayTextInputDialog(BuildContext context, String title, String preText) async {
+    return await showDialog(
+      context: context,
+      builder: (context) {
+        final TextEditingController textFieldController = TextEditingController();
+        return AlertDialog(
+          title: Text(title), // Pop-up Title
+          content: TextField(
+            controller: textFieldController,
+            autofocus: true, // Automatically opens keyboard
+            decoration: (preText=="")?InputDecoration(hintText: "Type something here"):null,
+          ),
+          actions: <Widget>[
+            // Cancel Button
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.pop(context, null); // Close the pop-up
+              },
+            ),
+            // Save/OK Button
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () {
+                Navigator.pop(context, textFieldController.text); // Close the pop-up
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
+  Future<bool> displayBooleanInputDialog(BuildContext context, String title) async {
+    return await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          actions: <Widget>[
+            // Cancel Button
+            TextButton(
+              child: Text('No'),
+              onPressed: () {
+                Navigator.pop(context, false); // Close the pop-up
+              },
+            ),
+            // Save/OK Button
+            TextButton(
+              child: const Text('Yes'),
+              onPressed: () {
+                Navigator.pop(context, true); // Close the pop-up
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: EdgeInsets.only(top: 40, bottom: 20, left: 20),
-          decoration: BoxDecoration(
-            color: Colors.deepPurpleAccent,
-          ),
-          child: Text(
-            "Shuka",
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 40
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: AssetImage("assets/icon/icon.png"),
             ),
-          ),
+            SizedBox(width: 10,),
+            Text("Shuka"),
+          ],
         ),
-        Expanded(
-          child: ListView.builder(
-            scrollDirection: Axis.vertical,
-            padding: EdgeInsets.all(10),
-            itemCount: alarmCalls.length,
-            itemBuilder: (context, index) {
-              final note = alarmCalls[index];
-              return ListTile(
-                title: Text(note.title),
-                onTap: () async {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(note.title),
-                      behavior: SnackBarBehavior.floating, // Lifts it up
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      margin: const EdgeInsets.all(20), // Adds space around it
-                    ),
-                  );
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          bool isPeriodic = await displayBooleanInputDialog(context, "Is Periodic?");
 
-                  note.time=DateTime.now().add(Duration(seconds: 20));
-                  note.id+=1;
+          DateTime? pickedDate = DateTime.now();
 
-                  print("Setting alarm at : ${note.time}");
+          if(!isPeriodic)
+            {
+              pickedDate = await showDatePicker(
+                context: context,
+                helpText: "Alarm Date",
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
 
-                  final setOrNot = await AndroidAlarmManager.oneShotAt(
-                      note.time,
-                      note.id,
+              if(pickedDate==null)
+              {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Cancelled creating Alarm'),
+                    behavior: SnackBarBehavior.floating, // Lifts it up
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    margin: const EdgeInsets.all(20), // Adds space around it
+                  ),
+                );
+                return;
+              }
+            }
+
+          TimeOfDay? pickedTime = await showTimePicker(
+            context: context,
+            helpText: "Alarm Time",
+            initialTime: TimeOfDay.now(),
+          );
+
+          if(pickedTime==null)
+          {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Cancelled creating Alarm'),
+                behavior: SnackBarBehavior.floating, // Lifts it up
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                margin: const EdgeInsets.all(20), // Adds space around it
+              ),
+            );
+            return;
+          }
+
+          String? title = await displayTextInputDialog(context, "Title", "");
+
+          if(title==null || title=="")
+          {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Cancelled creating Alarm'),
+                behavior: SnackBarBehavior.floating, // Lifts it up
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                margin: const EdgeInsets.all(20), // Adds space around it
+              ),
+            );
+            return;
+          }
+
+          String? description = await displayTextInputDialog(context, "Description", "");
+
+          if(description==null || description=="")
+          {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Cancelled creating Alarm'),
+                behavior: SnackBarBehavior.floating, // Lifts it up
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                margin: const EdgeInsets.all(20), // Adds space around it
+              ),
+            );
+            return;
+          }
+
+          String? callSpeech = await displayTextInputDialog(context, "Question", "This is an alarm!");
+
+          if(callSpeech==null || callSpeech=="")
+          {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Cancelled creating Alarm'),
+                behavior: SnackBarBehavior.floating, // Lifts it up
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                margin: const EdgeInsets.all(20), // Adds space around it
+              ),
+            );
+            return;
+          }
+
+          String? repetitions = await displayTextInputDialog(context, "Repeat?", "1");
+
+          int rep = 1;
+
+          if(repetitions==null || repetitions=="")
+          {
+            try {
+              rep = int.parse(repetitions!);
+            } catch (exp) {
+              print("Exp : ${exp}");
+            }
+          }
+
+          int? id = await preferencesAsync.getInt("AlarmIdTop");
+          List<String>? ids = await preferencesAsync.getStringList("AlarmIdList");
+
+          ids ??= [];
+
+          id ??= 1000;
+
+          id++;
+
+          if(pickedDate!=null && pickedTime!=null && title != null && description !=null && callSpeech!=null)
+            {
+              DateTime alarmTime = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
+
+              AlarmCall alarmCall = AlarmCall(id: id, uuid: Uuid().v4(), title: title, description: description, callSpeech: callSpeech, time: alarmTime, isPeriodic: isPeriodic, repetitions: rep);
+
+              final alarmidName = "ShukaAlarm_$id";
+
+              preferencesAsync.setString(alarmidName, alarmCall.toJson());
+
+              bool setOrNot = false;
+
+              if(isPeriodic)
+                {
+                  setOrNot = await AndroidAlarmManager.periodic(
+                      Duration(hours: 24),
+                      alarmCall.id,
                       triggerCallUI,
-                      alarmClock: true,
-                      params: note.toMap(),
+                      startAt: alarmCall.time,
                       exact: true,
                       rescheduleOnReboot: true,
                       wakeup: true,
                       allowWhileIdle: true
                   );
+                }
+              else {
+                setOrNot = await AndroidAlarmManager.oneShotAt(
+                    alarmCall.time,
+                    alarmCall.id,
+                    triggerCallUI,
+                    alarmClock: true,
+                    exact: true,
+                    rescheduleOnReboot: true,
+                    wakeup: true,
+                    allowWhileIdle: true
+                );
+              }
 
-                  print("Alarm Set ${setOrNot}");
+              ids.add(alarmidName);
+
+              preferencesAsync.setInt("AlarmIdTop", id);
+
+              preferencesAsync.setStringList("AlarmIdList", ids);
+
+              setState(() {
+                alarmCalls.add(alarmCall);
+              });
+            }
+        },
+        child: const Icon(Icons.alarm_add, color: Colors.white,),
+        backgroundColor: Colors.deepPurple,
+      ),
+      body: SafeArea(
+        child: ListView.builder(
+          scrollDirection: Axis.vertical,
+          padding: EdgeInsets.all(10),
+          itemCount: alarmCalls.length,
+          itemBuilder: (context, index) {
+            final note = alarmCalls[index];
+            return InkWell(
+                child: AlarmCard(alarmCall: note),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Long Press To Delete'),
+                      behavior: SnackBarBehavior.floating, // Lifts it up
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      margin: const EdgeInsets.all(20), // Adds space around it
+                    ),
+                  );
+                  },
+                onLongPress: () async {
+                  bool deleted = await AndroidAlarmManager.cancel(note.id);
+
+                  if(deleted) {
+                    await preferencesAsync.remove("ShukaAlarm_${note.id}");
+
+                    List<String>? alarms = await preferencesAsync.getStringList("AlarmIdList");
+
+                    if(alarms!=null)
+                      {
+                        alarms.removeWhere((idName) => (idName =="ShukaAlarm_${note.id}"));
+                        await preferencesAsync.setStringList("AlarmIdList", alarms);
+                      }
+
+                    setState(() {
+                      alarmCalls.removeAt(index);
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Alarm Deleted'),
+                        behavior: SnackBarBehavior.floating, // Lifts it up
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        margin: const EdgeInsets.all(20), // Adds space around it
+                      ),
+                    );
+                  }
                 },
-                onLongPress: () {
-                  print("Triggering call");
-                  triggerCallUI(note.id, note.toMap());
-                },
-              );
-            },
-          ),
+            );
+          },
         ),
-      ],
+      ),
     );
   }
 }
+
+class AlarmCard extends StatefulWidget {
+  const AlarmCard({super.key, required this.alarmCall});
+
+  final AlarmCall alarmCall;
+
+  @override
+  State<AlarmCard> createState() => _AlarmCardState();
+}
+
+class _AlarmCardState extends State<AlarmCard> {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias, // Ensures the color doesn't bleed over the rounded corners
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 100,
+            color: Colors.deepPurpleAccent,
+            child: Row(
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20, horizontal: 25),
+                  child: CircleAvatar(
+                    child: Icon(Icons.person, color: Colors.deepPurpleAccent,),
+                    backgroundColor: Colors.white,
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("${widget.alarmCall.title}(${widget.alarmCall.repetitions.toString()})${(widget.alarmCall.isPeriodic?"*":"")}", style: TextStyle(color: Colors.white, fontSize: 20),),
+                      Text(widget.alarmCall.isPeriodic?"${((DateTime.now().hour*60+DateTime.now().minute)>(widget.alarmCall.time.hour*60+widget.alarmCall.time.minute))?"Tomorrow":"Today"} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}":"${widget.alarmCall.time.day}/${widget.alarmCall.time.month}/${widget.alarmCall.time.year} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}", style: TextStyle(color: Colors.white, fontSize: 14),)
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(widget.alarmCall.description, style: TextStyle(color: Colors.deepPurpleAccent),),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
 
 class AlarmCall {
   int id;
   String uuid;
   String title, description, callSpeech;
   DateTime time;
+  int repetitions;
+  bool isPeriodic;
+  int? timeString;
 
-  AlarmCall({required this.id, required this.uuid, required this.title, required this.description, required this.callSpeech, required this.time});
+  AlarmCall({required this.id, required this.uuid, required this.title, required this.description, required this.callSpeech, required this.time, required this.isPeriodic, required this.repetitions, this.timeString});
 
   Map<String, dynamic> toMap() {
     return {
@@ -233,8 +453,24 @@ class AlarmCall {
       "uuid": uuid,
       "title": title,
       "description": description,
-      "callSpeech": callSpeech
+      "callSpeech": callSpeech,
+      "repetitions": repetitions,
+      "timeString": time.millisecondsSinceEpoch,
+      "isPeriodic": isPeriodic
     };
+  }
+
+  static AlarmCall fromMap(Map<String, dynamic> map) {
+    return AlarmCall(id: map["id"], uuid: map["uuid"], title: map["title"], description: map["description"], callSpeech: map["callSpeech"], time: DateTime.fromMillisecondsSinceEpoch(map["timeString"]), isPeriodic: map["isPeriodic"], repetitions: map["repetitions"]);
+  }
+
+  static AlarmCall fromJson(String string) {
+    Map<String, dynamic> map = json.decode(string);
+    return fromMap(map);
+  }
+
+  String toJson() {
+    return json.encode(toMap());
   }
 }
 

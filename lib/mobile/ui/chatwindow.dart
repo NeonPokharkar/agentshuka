@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'package:agentshuka/basic/alarmmanager.dart';
-import 'package:agentshuka/basic/voicebubble.dart';
+import 'package:agentshuka/mobile/ui/alarmmanager.dart';
+import 'package:agentshuka/mobile/ui/voicebubble.dart';
 import 'package:flutter/services.dart';
 
-import 'package:agentshuka/basic/messagebubble.dart';
-import 'package:agentshuka/basic/textbox.dart';
+import 'package:agentshuka/mobile/ui/messagebubble.dart';
+import 'package:agentshuka/mobile/ui/textbox.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
 import 'package:shake/shake.dart';
+
+import '../../shared/colors/colors.dart';
 
 class ChatWindow extends StatefulWidget {
   const ChatWindow({super.key});
@@ -182,7 +184,7 @@ class _ChatWindowState extends State<ChatWindow> {
                   return Icon(
                     value, // Your choice of icon
                     size: 50,
-                    color: Colors.deepPurple,
+                    color: colorThemeCurrent.colors.primaryColor,
                   );
                 }),
                 SizedBox(height: 20),
@@ -191,7 +193,7 @@ class _ChatWindowState extends State<ChatWindow> {
                     value,
                     style: TextStyle(
                         fontSize: 16,
-                        color: Colors.deepPurpleAccent
+                        color: colorThemeCurrent.colors.secondaryColor
                     ),
                     textAlign: TextAlign.center,
                   );
@@ -285,7 +287,7 @@ class _ChatWindowState extends State<ChatWindow> {
         return PopScope(
           canPop: true, // Allows closing with the hardware back button
           child: AlertDialog(
-            title: Text("Thought Process", style: TextStyle(color: Colors.deepPurple),),
+            title: Text("Thought Process", style: TextStyle(color: colorThemeCurrent.colors.primaryColor),),
             content: SizedBox(
               width: double.maxFinite,
               child: ListView.builder(
@@ -295,8 +297,8 @@ class _ChatWindowState extends State<ChatWindow> {
                   return InkWell(
                     onTap: () {},
                     child: ListTile(
-                      title: Tooltip(message: steps[index]["content"] ,child: Text(steps[index]["content"], style: TextStyle(color: Colors.deepPurpleAccent), maxLines: 3, overflow: TextOverflow.ellipsis,),),
-                      leading: Icon(iconsForAction(steps[index]["type"]), color: Colors.deepPurple,),
+                      title: Tooltip(message: steps[index]["content"] ,child: Text(steps[index]["content"], style: TextStyle(color: colorThemeCurrent.colors.secondaryColor), maxLines: 3, overflow: TextOverflow.ellipsis,),),
+                      leading: Icon(iconsForAction(steps[index]["type"]), color: colorThemeCurrent.colors.primaryColor,),
                     ),
                   );
                 },
@@ -316,7 +318,7 @@ class _ChatWindowState extends State<ChatWindow> {
         return PopScope(
           canPop: true, // Allows closing with the hardware back button
           child: AlertDialog(
-            title: Text("Error Details", style: TextStyle(color: Colors.deepPurple),),
+            title: Text("Error Details", style: TextStyle(color: colorThemeCurrent.colors.primaryColor),),
             content: SizedBox(
               width: double.maxFinite,
               child: ListView(
@@ -325,8 +327,8 @@ class _ChatWindowState extends State<ChatWindow> {
                   InkWell(
                     onTap: () {},
                     child: ListTile(
-                      title: Tooltip(message: message, child: Text(message, style: TextStyle(color: Colors.deepPurpleAccent), maxLines: 3, overflow: TextOverflow.ellipsis,)),
-                      leading: Icon(Icons.error, color: Colors.deepPurple,),
+                      title: Tooltip(message: message, child: Text(message, style: TextStyle(color: colorThemeCurrent.colors.secondaryColor), maxLines: 3, overflow: TextOverflow.ellipsis,)),
+                      leading: Icon(Icons.error, color: colorThemeCurrent.colors.primaryColor,),
                     ),
                   )
                 ],
@@ -507,7 +509,8 @@ class _ChatWindowState extends State<ChatWindow> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundImage: AssetImage("assets/icon/icon.png"),
+              backgroundImage: colorThemeCurrent.colors.iconBare,
+              backgroundColor: colorThemeCurrent.colors.secondaryColor[100],
             ),
             SizedBox(width: 10,),
             Text("Shuka"),
@@ -515,7 +518,7 @@ class _ChatWindowState extends State<ChatWindow> {
             Text(
               status,
               style: TextStyle(
-                color: Colors.deepPurpleAccent,
+                color: colorThemeCurrent.colors.secondaryColor,
                 fontStyle: FontStyle.italic,
                 fontSize: 18
               ),
@@ -530,12 +533,12 @@ class _ChatWindowState extends State<ChatWindow> {
             Container(
               padding: EdgeInsets.only(top: 40, bottom: 20, left: 20),
               decoration: BoxDecoration(
-                color: Colors.deepPurpleAccent,
+                color: colorThemeCurrent.colors.secondaryColor,
               ),
               child: Text(
                 "Shuka",
                 style: TextStyle(
-                    color: Colors.white,
+                    color: colorThemeCurrent.colors.primaryContrastColor,
                     fontSize: 40
                 ),
               ),
@@ -545,8 +548,8 @@ class _ChatWindowState extends State<ChatWindow> {
                 children: [
                   InkWell(
                     child: ListTile(
-                      leading: Icon(Icons.alarm, color: Colors.deepPurple,),
-                      title: Text("Reminders", style: TextStyle(color: Colors.deepPurple),),
+                      leading: Icon(Icons.alarm, color: colorThemeCurrent.colors.primaryColor,),
+                      title: Text("Reminders", style: TextStyle(color: colorThemeCurrent.colors.primaryColor),),
                     ),
                     onTap: () {
                       Navigator.push(

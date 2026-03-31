@@ -4,6 +4,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shake/shake.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../shared/colors/colors.dart';
+
 class Voicebubble extends StatefulWidget {
   Voicebubble({super.key, required this.controller, required this.userTarget, this.extraInfo});
 
@@ -230,13 +232,14 @@ class VoicebubbleState extends State<Voicebubble> {
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
-          backgroundImage: AssetImage("assets/icon/icon.png"),
+          backgroundImage: colorThemeCurrent.colors.iconBare,
+          backgroundColor: colorThemeCurrent.colors.secondaryColor[100],
         ),
         SizedBox(width: 10,),
         Text(
             state!.name.toString(),
             style: TextStyle(
-                color: Colors.deepPurple,
+                color: colorThemeCurrent.colors.primaryColor,
                 fontStyle: FontStyle.italic,
                 fontSize: 18
             )
@@ -245,7 +248,7 @@ class VoicebubbleState extends State<Voicebubble> {
         if(text!=null) Text(
           text!,
           style: TextStyle(
-              color: Colors.deepPurpleAccent,
+              color: colorThemeCurrent.colors.secondaryColor,
               fontStyle: FontStyle.italic,
               fontSize: 16
           ),

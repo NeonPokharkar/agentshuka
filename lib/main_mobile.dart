@@ -1,9 +1,8 @@
-import 'package:agentshuka/basic/chatwindow.dart';
+import 'package:agentshuka/mobile/ui/chatwindow.dart';
+import 'package:agentshuka/shared/colors/colors.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-import 'basic/alarmmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +29,7 @@ class _MainAppState extends State<MainApp> {
       debugShowCheckedModeBanner: false,
       title: 'Shuka',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: colorThemeCurrent.colors.primaryColor),
       ),
       home: ChatWindow()
     );

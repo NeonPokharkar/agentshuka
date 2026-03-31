@@ -1,8 +1,10 @@
-import 'package:agentshuka/support/LatexSupport.dart';
+import 'package:agentshuka/mobile/utility/LatexSupport.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+
+import '../../shared/colors/colors.dart';
 
 class Messagebubble extends StatelessWidget {
   Messagebubble({required this.text, required this.isMe, required this.isJson, required this.onLongPress, required this.onDoubleTap, required this.onTap, this.isError=false}) {
@@ -23,7 +25,7 @@ class Messagebubble extends StatelessWidget {
   final VoidCallback onDoubleTap;
 
   Color? getBubbleColor(int intensity) {
-    return isError?Colors.red[intensity]:(isMe ? Colors.deepPurple[intensity] : Colors.grey[intensity]);
+    return isError?Colors.red[intensity]:(isMe ? colorThemeCurrent.colors.primaryColor[intensity] : Colors.grey[intensity]);
   }
 
   @override
@@ -45,7 +47,7 @@ class Messagebubble extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(12),
               constraints: BoxConstraints(maxWidth: 250),
-              child: isMe?Text(text, style: TextStyle(color: Colors.white, fontSize: 16),):(isError?Text(text, style: TextStyle(color: Colors.white, fontSize: 16),):MarkdownBody(data: isJson?data["answer"]:text, styleSheet: MarkdownStyleSheet(p: TextStyle(fontSize: 16)), builders: {'latex': LatexElementBuilder()},)),
+              child: isMe?Text(text, style: TextStyle(color: colorThemeCurrent.colors.primaryContrastColor, fontSize: 16),):(isError?Text(text, style: TextStyle(color: colorThemeCurrent.colors.primaryContrastColor, fontSize: 16),):MarkdownBody(data: isJson?data["answer"]:text, styleSheet: MarkdownStyleSheet(p: TextStyle(fontSize: 16)), builders: {'latex': LatexElementBuilder()},)),
             ),
           ),
         ),

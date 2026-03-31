@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../support/AlarmSupport.dart';
+import '../../shared/colors/colors.dart';
+import '../utility/AlarmSupport.dart';
 
 class Alarmmanager extends StatefulWidget {
   const Alarmmanager({super.key});
@@ -148,7 +149,8 @@ class _AlarmmanagerState extends State<Alarmmanager> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundImage: AssetImage("assets/icon/icon.png"),
+              backgroundImage: colorThemeCurrent.colors.iconBare,
+              backgroundColor: colorThemeCurrent.colors.secondaryColor[100],
             ),
             SizedBox(width: 10,),
             Text("Shuka"),
@@ -320,8 +322,8 @@ class _AlarmmanagerState extends State<Alarmmanager> {
               });
             }
         },
-        child: const Icon(Icons.alarm_add, color: Colors.white,),
-        backgroundColor: Colors.deepPurple,
+        child: Icon(Icons.alarm_add, color: colorThemeCurrent.colors.primaryContrastColor,),
+        backgroundColor: colorThemeCurrent.colors.primaryColor,
       ),
       body: SafeArea(
         child: ListView.builder(
@@ -401,14 +403,14 @@ class _AlarmCardState extends State<AlarmCard> {
         children: [
           Container(
             height: 100,
-            color: Colors.deepPurpleAccent,
+            color: colorThemeCurrent.colors.secondaryColor,
             child: Row(
               children: [
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 20, horizontal: 25),
                   child: CircleAvatar(
-                    child: Icon(Icons.person, color: Colors.deepPurpleAccent,),
-                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, color: colorThemeCurrent.colors.secondaryColor,),
+                    backgroundColor: colorThemeCurrent.colors.baseColor,
                   ),
                 ),
                 Padding(
@@ -416,8 +418,8 @@ class _AlarmCardState extends State<AlarmCard> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text("${widget.alarmCall.title}(${widget.alarmCall.repetitions.toString()})${(widget.alarmCall.isPeriodic?"*":"")}", style: TextStyle(color: Colors.white, fontSize: 20),),
-                      Text(widget.alarmCall.isPeriodic?"${((DateTime.now().hour*60+DateTime.now().minute)>(widget.alarmCall.time.hour*60+widget.alarmCall.time.minute))?"Tomorrow":"Today"} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}":"${widget.alarmCall.time.day}/${widget.alarmCall.time.month}/${widget.alarmCall.time.year} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}", style: TextStyle(color: Colors.white, fontSize: 14),)
+                      Text("${widget.alarmCall.title}(${widget.alarmCall.repetitions.toString()})${(widget.alarmCall.isPeriodic?"*":"")}", style: TextStyle(color: colorThemeCurrent.colors.primaryContrastColor, fontSize: 20),),
+                      Text(widget.alarmCall.isPeriodic?"${((DateTime.now().hour*60+DateTime.now().minute)>(widget.alarmCall.time.hour*60+widget.alarmCall.time.minute))?"Tomorrow":"Today"} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}":"${widget.alarmCall.time.day}/${widget.alarmCall.time.month}/${widget.alarmCall.time.year} ${widget.alarmCall.time.hour>12?widget.alarmCall.time.hour-12:widget.alarmCall.time.hour}:${widget.alarmCall.time.minute} ${widget.alarmCall.time.hour>12?"PM":"AM"}", style: TextStyle(color: colorThemeCurrent.colors.primaryContrastColor, fontSize: 14),)
                     ],
                   ),
                 )
@@ -426,7 +428,7 @@ class _AlarmCardState extends State<AlarmCard> {
           ),
           Padding(
             padding: EdgeInsets.all(16.0),
-            child: Text(widget.alarmCall.description, style: TextStyle(color: Colors.deepPurpleAccent),),
+            child: Text(widget.alarmCall.description, style: TextStyle(color: colorThemeCurrent.colors.secondaryColor),),
           ),
         ],
       ),

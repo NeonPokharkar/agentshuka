@@ -12,6 +12,20 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
+subprojects {
+    afterEvaluate {
+        if (hasProperty("android")) {
+            configure<com.android.build.gradle.BaseExtension> {
+                if (namespace == null) {
+                    // Falls back to the project group name as the namespace
+                    namespace = group.toString()
+                }
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
@@ -19,3 +33,4 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+

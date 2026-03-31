@@ -4,6 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../shared/colors/colors.dart';
+
 class ChatInput extends StatefulWidget {
   const ChatInput({super.key, required this.isActive, required this.processInput});
 
@@ -22,7 +24,7 @@ class _ChatInputState extends State<ChatInput> {
   @override
   Widget build(BuildContext context) {return Container(
     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    color: Colors.white,
+    color: colorThemeCurrent.colors.baseColor,
     child: Row(
       children: [
         Expanded(
@@ -40,9 +42,9 @@ class _ChatInputState extends State<ChatInput> {
         ),
         SizedBox(width: 8,),
         CircleAvatar(
-          backgroundColor: widget.isActive?Colors.deepPurple:Colors.grey,
+          backgroundColor: widget.isActive?colorThemeCurrent.colors.primaryColor:Colors.grey,
           child: IconButton(
-            icon: widget.isActive?Icon(Icons.send, color: Colors.white,):Icon(Icons.lock, color: Colors.white,),
+            icon: widget.isActive?Icon(Icons.send, color: colorThemeCurrent.colors.primaryContrastColor,):Icon(Icons.lock, color: colorThemeCurrent.colors.primaryContrastColor,),
             onPressed: widget.isActive?() {
               widget.processInput(controller.text);
               controller.clear();

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:agentshuka/basic/alarmmanager.dart';
-import 'package:agentshuka/extensions/basic.dart';
+import 'package:agentshuka/mobile/ui/alarmmanager.dart';
+import 'package:agentshuka/shared/extensions/basic.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/entities/android_params.dart';
 import 'package:flutter_callkit_incoming/entities/call_event.dart';
@@ -11,6 +11,8 @@ import 'package:flutter_callkit_incoming/entities/notification_params.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../shared/colors/colors.dart';
 
 @pragma('vm:entry-point')
 Future<void> triggerCallUI(int id) async {
@@ -46,7 +48,7 @@ Future<void> callAlarm(AlarmCall alarmCall, FlutterTts tts, int times) async {
     id: alarmCall.uuid,
     nameCaller: alarmCall.title,
     appName: 'Shuka',
-    avatar: "assets/icon/icon.png",
+    avatar: colorThemeCurrent.colors.icon.assetName,
     handle: alarmCall.description,
     type: 0,
     textAccept: 'Complete',
@@ -67,11 +69,11 @@ Future<void> callAlarm(AlarmCall alarmCall, FlutterTts tts, int times) async {
     android: AndroidParams(
       isCustomNotification: true,
       isShowLogo: false,
-      logoUrl: "assets/icon/icon.png",
+      logoUrl: colorThemeCurrent.colors.icon.assetName,
       ringtonePath: 'system_ringtone_default',
-      backgroundColor: Colors.white.toHex(),
-      actionColor: Colors.deepPurple.toHex(),
-      textColor: Colors.deepPurple.toHex(),
+      backgroundColor: colorThemeCurrent.colors.baseColor.toHex(),
+      actionColor: colorThemeCurrent.colors.primaryColor.toHex(),
+      textColor: colorThemeCurrent.colors.primaryColor.toHex(),
       incomingCallNotificationChannelName: "Incoming Call",
       missedCallNotificationChannelName: "Missed Call",
       isShowCallID: true,

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'package:agentshuka/mobile/ui/alarmmanager.dart';
 import 'package:agentshuka/mobile/ui/voicebubble.dart';
 import 'package:agentshuka/shared/utility/wearcomms.dart';
 import 'package:flutter/services.dart';
@@ -467,44 +466,6 @@ class _ChatWindowState extends State<ChatWindow> {
                 fontSize: 18
               ),
             )
-          ],
-        ),
-      ),
-      drawer: Drawer(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: EdgeInsets.only(top: 40, bottom: 20, left: 20),
-              decoration: BoxDecoration(
-                color: colorThemeCurrent.colors.secondaryColor,
-              ),
-              child: Text(
-                "Shuka",
-                style: TextStyle(
-                    color: colorThemeCurrent.colors.primaryContrastColor,
-                    fontSize: 40
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                children: [
-                  InkWell(
-                    child: ListTile(
-                      leading: Icon(Icons.alarm, color: colorThemeCurrent.colors.primaryColor,),
-                      title: Text("Reminders", style: TextStyle(color: colorThemeCurrent.colors.primaryColor),),
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => Alarmmanager())
-                      );
-                    },
-                  )
-                ],
-              ),
-            ),
           ],
         ),
       ),

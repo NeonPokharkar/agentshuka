@@ -150,7 +150,7 @@ class _AlarmmanagerState extends State<Alarmmanager> {
           children: [
             CircleAvatar(
               backgroundImage: colorThemeCurrent.colors.iconBare,
-              backgroundColor: colorThemeCurrent.colors.secondaryColor[100],
+              backgroundColor: colorThemeCurrent.colors.baseColor,
             ),
             SizedBox(width: 10,),
             Text("Shuka"),

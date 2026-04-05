@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:agentshuka/mobile/ui/alarmmanager.dart';
 import 'package:agentshuka/mobile/ui/voicebubble.dart';
+import 'package:agentshuka/shared/utility/wearcomms.dart';
 import 'package:flutter/services.dart';
 
 import 'package:agentshuka/mobile/ui/messagebubble.dart';
@@ -14,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:shake/shake.dart';
 
 import '../../shared/colors/colors.dart';
+import '../utility/ShukaEngine.dart';
 
 class ChatWindow extends StatefulWidget {
   const ChatWindow({super.key});
@@ -23,6 +25,8 @@ class ChatWindow extends StatefulWidget {
 }
 
 class _ChatWindowState extends State<ChatWindow> {
+  WearComms wearComms = WearComms(targetCapability: "shuka_wear");
+
   String status = "Contacting";
   String premise = "Shuka is here to help!";
 
@@ -33,8 +37,8 @@ class _ChatWindowState extends State<ChatWindow> {
 
   bool dialogEnabled = false;
 
-  final List<Map<String, dynamic>> messages = [
-    {"text": "Ask me anything...", "isMe" : false, "isJson" : false, "extra": null}
+  final List<ShukaMessage> messages = [
+    ShukaMessage.fromStarter("Ask me anything...")
   ];
 
   final List<Map<String, dynamic>> notes = [
@@ -57,23 +61,61 @@ class _ChatWindowState extends State<ChatWindow> {
 
     detector = ShakeDetector.autoStart(
       onPhoneShake: (ShakeEvent event) async {
+        print("Shake Event");
+
         if(ctxglobal==null)
         {
           return;
         }
 
-        if(status!="Available")
-        {
+        print("Shake Event 2");
+
+        if(status!="Available") {
           return;
         }
+
+        print("Shake Event 3");
 
         if(!isShukaVoiceDialogOpen)
         {
           final result = await listenToUser(ctxglobal!);
-          sendMessageToShuka(ctxglobal!, result, true);
+
+          setState(() {
+            messages.add(ShukaMessage.fromUser(result));
+            status = "Thinking";
+          });
+
+
+          sendMessageToShuka(
+              query: result,
+              pastConversation: summarizePastTenDialogs(),
+              premise: premise,
+              onThought: (ShukaThought thought, IconData icon) {
+                if(thought.type=="start")
+                  {
+                    premise = thought.content;
+                  }
+                showLoadingDialog(context, thought.content, icon);
+              },
+              onResponse: (shukaMessage) {
+                popLoadingDialog(context);
+
+                setState(() {
+                  messages.add(shukaMessage);
+                  status = "Available";
+                });
+
+                shukaSpeak(shukaMessage.message);
+              }
+          );
         }
         else {
-          controller.restartListening!();
+          try {
+            controller.stopListening!();
+          }
+          catch (e) {
+            isShukaVoiceDialogOpen=false;
+          }
         }
       },
       useFilter: true,
@@ -94,6 +136,36 @@ class _ChatWindowState extends State<ChatWindow> {
     ctxglobal = null;
     // TODO: implement dispose
     super.dispose();
+  }
+
+  Future<void> setWearCommsUp() async {
+    bool setUp = await wearComms.init();
+
+    if(setUp) {
+      wearComms.receiveMessageFromTarget("/query", (WearCommsMessage mess) async {
+        setState(() {
+          messages.add(ShukaMessage.fromUser(mess.message));
+        });
+
+        sendMessageToShuka(
+            query: mess.message,
+            pastConversation: summarizePastTenDialogs(),
+            premise: premise,
+            onThought: (ShukaThought thought, IconData icon) {
+              if(thought.type=="start")
+              {
+                premise = thought.content;
+              }
+            },
+            onResponse: (shukaMessage) {
+              setState(() {
+                messages.add(shukaMessage);
+              });
+              wearComms.sendResponseToTarget("/query", WearCommsMessage.fromId(shukaMessage.message, mess.id));
+            }
+        );
+      });
+    }
   }
 
   Future<String> listenToUser(BuildContext ctx, {String extraInfo = ""}) async {
@@ -249,21 +321,21 @@ class _ChatWindowState extends State<ChatWindow> {
   String summarizePastTenDialogs() {
     int length = max(0, messages.length - 10);
 
-    List<Map<String, dynamic>> relevantConversation = messages.sublist(length);
+    List<ShukaMessage> relevantConversation = messages.sublist(length);
 
     String summary = "";
 
     for (int i = 0; i < length; i++) {
-      if(relevantConversation[i]["isMe"]) {
-        summary += "\n\n User:  ${relevantConversation[i]["text"]}";
+      if(relevantConversation[i].isUser) {
+        summary += "\n\n User:  ${relevantConversation[i].message}";
       } else {
-        if (relevantConversation[i]["isJson"])
+        if (relevantConversation[i].thoughtDetails!=null)
           {
-            var jsonMess = json.decode(relevantConversation[i]["text"]);
-            summary += "\n\n Agent-Thought: ${jsonMess["thought_summary"]} \n\n Agent: ${jsonMess["answer"]}";
+            var jsonMess = relevantConversation[i].thoughtDetails;
+            summary += "\n\n Agent-Thought: ${jsonMess?.thoughtsSummary} \n\n Agent: ${jsonMess?.answer}";
           }
           else {
-            summary += "\n\n Agent: ${relevantConversation[i]["text"]}";
+            summary += "\n\n Agent: ${relevantConversation[i].message}";
         }
       }
     }
@@ -356,134 +428,6 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
-  Future<String> getIfActive() async {
-    print("Checking Availability of Server");
-
-    final uri = Uri.http("100.72.140.76:8000","/status");
-
-    try {
-      final response = await http.get(uri);
-
-      if(response.statusCode == 200)
-        {
-          final data = json.decode(response.body);
-
-          return data["status"]?"Available":"Offline";
-        }
-      else {
-        return "Offline";
-      }
-    } catch (e) {
-      print("Error : $e");
-      return "Network Error";
-    }
-  }
-
-  Future<void> sendMessageToShuka(BuildContext ctx, String str, bool fromVoiceMode) async {
-    if(status!="Available")
-    {
-      return;
-    }
-    var relevantConversation = summarizePastTenDialogs();
-
-    setState(() {
-      messages.add({"text":str, "isMe":true, "isJson": false, "extra": null});
-      status = "Thinking";
-    });
-
-    showLoadingDialog(ctx, "Contacting Shuka...", Icons.network_check);
-
-    final queryParams = {
-      "query" : str,
-      "conversation_summary" : premise,
-      "last_relevant_conversation" : relevantConversation
-    };
-    final uri = Uri.http("100.72.140.76:8000","/intelli-chat");
-    try {
-      final request = await http.Request('POST', uri);
-      request.headers.addAll({
-        'Connection': 'Keep-Alive',
-        'Keep-Alive': 'timeout=1000, max=1000',
-        'Content-Type': 'application/json; charset=UTF-8',
-      });
-      request.body = json.encode(queryParams);
-      final response = await http.Client().send(request);
-
-      if(response.statusCode == 200)
-      {
-        var process = [];
-        var isError = false;
-        var finl = "";
-        var thoughtsSummary = "";
-
-        response.stream.listen((value) {
-          final str = String.fromCharCodes(value);
-          final jsn = json.decode(str);
-          process.add(jsn);
-          showLoadingDialog(ctx, jsn["content"], iconsForAction(jsn["type"]));
-          if(jsn["type"]=="final_answer")
-          {
-            finl = jsn["content"];
-          }
-          else if(jsn["type"]=="start")
-          {
-            premise = jsn["content"];
-          }
-          else if(jsn["type"]=="summary")
-          {
-            thoughtsSummary = jsn["content"];
-          }
-        }, onError: (e) {
-          isError = true;
-          popLoadingDialog(ctx);
-          setState(() {
-            messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra": "Status Code: ${response.statusCode}, with error : ${e.toString()}"});
-            status = "Available";
-            if(fromVoiceMode)
-              {
-                shukaSpeak("There was some error!");
-              }
-          });
-        }, onDone: () {
-          if(response.statusCode==200 && !isError) {
-            popLoadingDialog(ctx);
-            setState(() {
-              messages.add({"text": json.encode({"answer":finl, "steps":process, "question" : str, "thoughts_summary": thoughtsSummary}), "isMe":false, "isJson":true, "extra": null});
-              status = "Available";
-              if(fromVoiceMode)
-              {
-                shukaSpeak(finl);
-              }
-            });
-          }
-        });
-
-      } else {
-        popLoadingDialog(ctx);
-        print("Request Failed");
-        setState(() {
-          messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with Status Code : ${response.statusCode}"});
-          status = "Available";
-          if(fromVoiceMode)
-          {
-            shukaSpeak("There was some error!");
-          }
-        });
-      }
-    } catch (e) {
-      popLoadingDialog(ctx);
-      print("Error : $e");
-      setState(() {
-        messages.add({"text": "We could not contact Shuka!", "isMe":false, "isJson":false, "extra" : "Request failed with error : ${e.toString()}"});
-        status = "Available";
-        if(fromVoiceMode)
-        {
-          shukaSpeak("There was some error!");
-        }
-      });
-    }
-  }
-
   shukaSpeak(String text) async {
     if(ctxglobal==null)
     {
@@ -510,7 +454,7 @@ class _ChatWindowState extends State<ChatWindow> {
           children: [
             CircleAvatar(
               backgroundImage: colorThemeCurrent.colors.iconBare,
-              backgroundColor: colorThemeCurrent.colors.secondaryColor[100],
+              backgroundColor: colorThemeCurrent.colors.baseColor,
             ),
             SizedBox(width: 10,),
             Text("Shuka"),
@@ -575,21 +519,18 @@ class _ChatWindowState extends State<ChatWindow> {
                 itemBuilder: (context, index) {
                   final msg = messages[index];
                   return Messagebubble(
-                    text: msg["text"],
-                    isMe: msg["isMe"],
-                    isJson: msg["isJson"],
-                    isError: msg["extra"]!=null,
+                    message: msg,
                     onTap: () {
-                      if(msg["isJson"] && !msg["isMe"])
+                      if(msg.thoughtDetails!=null && !msg.isUser)
                       {
-                        final jsmn = json.decode(msg["text"]);
-                        showThoughtSequenceDialog(context, jsmn["steps"], jsmn["question"]);
+                        final jsmn = msg.thoughtDetails;
+                        showThoughtSequenceDialog(context, jsmn!.steps, jsmn.question);
                       }
-                      if(msg["extra"]!=null)
+                      if(msg.errorMessage!=null)
                         {
-                          showErrorDialog(context, msg["extra"]);
+                          showErrorDialog(context, msg.errorMessage!);
                         }
-                      if(!msg["isJson"] && !msg["isMe"])
+                      if(msg.thoughtDetails==null && !msg.isUser)
                         {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -600,7 +541,7 @@ class _ChatWindowState extends State<ChatWindow> {
                             ),
                           );
                         }
-                      if(msg["isMe"])
+                      if(msg.isUser)
                         {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -613,13 +554,7 @@ class _ChatWindowState extends State<ChatWindow> {
                         }
                     },
                     onLongPress: () {
-                      if(msg["isJson"])
-                      {
-                        Clipboard.setData(ClipboardData(text: json.decode(msg["text"])["answer"]));
-                      }
-                      else {
-                        Clipboard.setData(ClipboardData(text: msg["text"]));
-                      }
+                      Clipboard.setData(ClipboardData(text: msg.message));
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text('Text copied to clipboard!'),
@@ -645,8 +580,36 @@ class _ChatWindowState extends State<ChatWindow> {
             ),
             ChatInput(
               isActive: status == "Available",
-              processInput: (str) {
-                sendMessageToShuka(context, str, false);
+              processInput: (str) async {
+                if(status!="Available")
+                {
+                  return;
+                }
+
+                setState(() {
+                  messages.add(ShukaMessage.fromUser(str));
+                  status = "Thinking";
+                });
+
+                sendMessageToShuka(
+                  query: str,
+                  pastConversation: summarizePastTenDialogs(),
+                  premise: premise,
+                  onThought: (ShukaThought thought, IconData icon) {
+                    if(thought.type=="start")
+                    {
+                      premise = thought.content;
+                    }
+                    showLoadingDialog(context, thought.content, icon);
+                  },
+                  onResponse: (shukaMessage) {
+                    popLoadingDialog(context);
+                    setState(() {
+                      messages.add(shukaMessage);
+                      status = "Available";
+                    });
+                  }
+                );
               },
             )
           ],

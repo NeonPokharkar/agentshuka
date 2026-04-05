@@ -7,10 +7,13 @@ import 'package:flutter_wear_os_connectivity/flutter_wear_os_connectivity.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterWearOsConnectivity _flutterWearOsConnectivity = FlutterWearOsConnectivity();
-  _flutterWearOsConnectivity.configureWearableAPI();
-
   runApp(MainApp());
+
+  FlutterWearOsConnectivity flutterWearOsConnectivity = FlutterWearOsConnectivity();
+
+  await flutterWearOsConnectivity.configureWearableAPI();
+
+  await flutterWearOsConnectivity.registerNewCapability("shuka_wear");
 }
 
 class MainApp extends StatefulWidget {
